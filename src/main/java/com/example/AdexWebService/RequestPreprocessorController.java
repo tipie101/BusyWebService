@@ -3,6 +3,7 @@ package com.example.AdexWebService;
 import com.example.AdexWebService.dbconnection.*;
 import inet.ipaddr.IPAddress;
 import inet.ipaddr.IPAddressString;
+import org.apache.coyote.Request;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
@@ -17,6 +18,7 @@ import javax.websocket.server.PathParam;
 import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.List;
 import java.util.Optional;
 
 // TODO:
@@ -107,7 +109,7 @@ public class RequestPreprocessorController {
             customer = customerReply.get();
         });*/
 
-
+        // TODO: Get this to work, baby!!!
         update_hourly_stats(customerID, timestamp, valid);
         return processValidRequest(customerID, tagID, userID, remoteIP, timestamp, activeCustomerFound);
     }
@@ -119,6 +121,19 @@ public class RequestPreprocessorController {
 
     public void update_hourly_stats(long customID, long time, boolean validRequest) {
         // update DB
+        List<RequestStat> stats = hourlyStatRepo.findRecentRequestsForCostumer(customID, time - 1000*60*60);
+        if (stats.isEmpty()) {
+            System.out.println("ALL EMPTY!");
+            RequestStat stat = new RequestStat();
+            stat.setCustomerId(customID);
+            stat.setTime(time); // TODO: datetime-conversion
+            stat.setInvalidCount(0);
+            stat.setRequestCount(1);
+            if (!validRequest) {
+                stat.setInvalidCount(1);
+            }
+            hourlyStatRepo.save(stat);
+        }
     }
 
     @RequestMapping(method = RequestMethod.GET, path = "/customerStats")
@@ -167,6 +182,8 @@ public class RequestPreprocessorController {
     public boolean isBlacklisted(Integer ip) {
         return false;
     }
+
+
 
 
 }

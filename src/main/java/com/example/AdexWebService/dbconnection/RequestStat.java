@@ -1,6 +1,7 @@
 package com.example.AdexWebService.dbconnection;
 
 import javax.persistence.*;
+import java.math.BigInteger;
 
 @Entity
 @Table(name="hourly_stats")
@@ -13,11 +14,11 @@ public class RequestStat {
 
     // TODO: constrain: int(11)
     @Column(name="customer_id")
-    private Integer customerId;
+    private Long customerId;
 
     // TODO: constrain: timestamp
     @Column(name="time")
-    private Integer time;
+    private Long time;
 
     // TODO: bigint(20)
     @Column(name="request_count")
@@ -25,7 +26,7 @@ public class RequestStat {
     @Column(name="invalid_count")
     private Integer invalidCount;
 
-    protected RequestStat() {
+    public RequestStat() {
 
     }
 
@@ -48,19 +49,19 @@ public class RequestStat {
         this.id = id;
     }
 
-    public Integer getCustomerId() {
+    public Long getCustomerId() {
         return customerId;
     }
 
-    public void setCustomerId(Integer customerId) {
+    public void setCustomerId(Long customerId) {
         this.customerId = customerId;
     }
 
-    public Integer getTime() {
+    public Long getTime() {
         return time;
     }
 
-    public void setTime(Integer time) {
+    public void setTime(Long time) {
         this.time = time;
     }
 

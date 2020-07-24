@@ -3,17 +3,17 @@ package com.example.AdexWebService.dbconnection;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.data.repository.query.Param;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.RequestMapping;
 
-@RequestMapping
-@Transactional
+import java.util.List;
+
+
 public interface RepositoryHourlyStats extends CrudRepository<RequestStat, Integer> {
 
-    // TODO: Iterable???
-/*    @Query("SELECT h FROM RequestStat WHERE h.customer_id =: customer_id")
-    Iterable<RequestStat> findRequestsForCostumer(@Param("customer_id") Integer customer_id);*/
+    @Query(value = "SELECT h FROM RequestStat h WHERE h.customerId = :customer_id")
+    public List<RequestStat> findRequestsForCostumer(@Param("customer_id") Long customer_id);
 
-
+    @Query(value = "SELECT h FROM RequestStat h WHERE h.customerId = :customer_id AND h.time >= :min_time")
+    public List<RequestStat> findRecentRequestsForCostumer(
+            @Param("customer_id") Long customer_id, @Param("min_time") Long min_time);
 
 }
