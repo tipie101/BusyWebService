@@ -44,8 +44,10 @@ public class RequestPreprocessorController {
     private RepositoryCustomer customerRepo;
 
     // TODO:
-    // place db within project
+    // dump the db
+    // create README
     // refactor and write comments + docs
+    // check and implement all constraints (like int(11) etc.)
 
 
     @RequestMapping(consumes = MediaType.APPLICATION_JSON_VALUE, path = "/requests")
