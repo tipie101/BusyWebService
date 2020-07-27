@@ -3,7 +3,6 @@ package com.example.AdexWebService;
 import com.example.AdexWebService.dbconnection.*;
 import inet.ipaddr.IPAddress;
 import inet.ipaddr.IPAddressString;
-import org.apache.coyote.Request;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
@@ -45,17 +44,10 @@ public class RequestPreprocessorController {
     private RepositoryCustomer customerRepo;
 
     // TODO:
-    // endpoint for creating/updating RequestStat
-    // endpoints for reading RequestStats
+    // place db within project
+    // return json instead of Stings
+    // refactor and write comments + docs
 
-    // invalid request -> return json:
-    // {
-    //   "timestamp": "2020-07-22T16:38:20.728+00:00",
-    //   "status": 400,
-    //   "error": "Bad Request",
-    //   "message": "invalid customerID value",
-    //   "path": "/requests"
-    // }
 
     @RequestMapping(consumes = MediaType.APPLICATION_JSON_VALUE, path = "/requests")
     public String handleRequest(@RequestBody String body) {
@@ -106,14 +98,6 @@ public class RequestPreprocessorController {
             activeCustomerFound = customerReply.get().getActive();
         }
 
-
-/*        customerReply.ifPresent( x -> {
-            System.out.println("hello: " + x.toString());
-            System.out.println(customerReply.get().getActive());
-            customer = customerReply.get();
-        });*/
-
-        // TODO: Get this to work, baby!!!
         update_hourly_stats(customerID, timestamp, valid);
         return processValidRequest(customerID, tagID, userID, remoteIP, timestamp, activeCustomerFound);
     }
@@ -152,18 +136,47 @@ public class RequestPreprocessorController {
     }
 
     @RequestMapping(method = RequestMethod.GET, path = "/customerStats")
-    public String getCostumerStats(@PathParam("customerID") Integer customerID) {
-        // call aggregateForCustomer()
-        // call aggregateAll()
-        return "stats";
+    public String getCostumerStats(@PathParam("customerID") Long customerID) {
+
+        // check if customer exists in DB
+
+        List<RequestStat> stats = hourlyStatRepo.findRequestsForCostumer(customerID);
+        if (stats.isEmpty()){
+            System.out.println("nothing found customer");
+        } else {
+            System.out.println("found customer");
+        }
+
+        int[] requestCounts  = aggregateRequestCounts(stats);
+
+        return "stats for customer_id " + customerID + ": #req = " + requestCounts[0] + " and #invalid = " + requestCounts[1];
     }
 
     @RequestMapping(method = RequestMethod.GET, path = "/dailyStats")
     public String getDailyStats(@PathParam("date") String date) {
-        // convert date
-        // call aggregateForDate()
-        // call aggregateAll()
-        return "stats";
+        // TODO: Check if Date exists
+
+        List<RequestStat> stats = hourlyStatRepo.findStatsOfDay(date);
+        if (stats.isEmpty()){
+            System.out.println("stats.isEmpty()");
+        } else {
+            System.out.println("stats is not Empty");
+        }
+        System.out.println(date);
+
+        int[] requestCounts  = aggregateRequestCounts(stats);
+
+        return "stats(" + date + "): #req = " + requestCounts[0] + " and #invalid = " + requestCounts[1];
+    }
+
+    private int[] aggregateRequestCounts(List<RequestStat> stats) {
+        int requests = 0;
+        int invalid = 0;
+        for (RequestStat stat: stats) {
+            requests += stat.getRequestCount();
+            invalid += stat.getInvalidCount();
+        }
+        return new int[]{requests, invalid};
     }
 
     public boolean isValidIP(String ip) {
@@ -197,8 +210,5 @@ public class RequestPreprocessorController {
     public boolean isBlacklisted(Integer ip) {
         return false;
     }
-
-
-
 
 }
