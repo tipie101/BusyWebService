@@ -20,4 +20,6 @@ public interface RepositoryHourlyStats extends CrudRepository<RequestStat, Integ
     @Query(value = "SELECT h FROM RequestStat h WHERE DATE_FORMAT(h.time, '%Y-%m-%d') = :date")
     public List<RequestStat> findStatsOfDay(@Param("date") String date);
 
+    @Query(value = "SELECT h FROM RequestStat h WHERE h.customerId = :customer_id AND DATE_FORMAT(h.time, '%Y-%m-%d') = :date")
+    List<RequestStat> findStatsOfDayForCostumer(@Param("customer_id") Long customerID, @Param("date") String date);
 }

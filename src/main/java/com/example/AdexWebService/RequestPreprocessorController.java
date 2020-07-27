@@ -135,6 +135,21 @@ public class RequestPreprocessorController {
             hourlyStatRepo.save(stat);
     }
 
+    @RequestMapping(method = RequestMethod.GET, path = "/customersDailyStats")
+    public String getCostumersDailyStats(@PathParam("customerID") Long customerID, @PathParam("date") String date) {
+        // check if customer exists in DB and date is valid
+        // date has have format xxxx-xx-xx (autocreate zeros for m and d)
+        List<RequestStat> stats = hourlyStatRepo.findStatsOfDayForCostumer(customerID, date);
+        if (stats.isEmpty()){
+            System.out.println("nothing found customer");
+        } else {
+            System.out.println("found customer");
+        }
+
+        int[] requestCounts  = aggregateRequestCounts(stats);
+        return "stats of " + date + " for customer_id " + customerID + ": #req = " + requestCounts[0] + " and #invalid = " + requestCounts[1];
+    }
+
     @RequestMapping(method = RequestMethod.GET, path = "/customerStats")
     public String getCostumerStats(@PathParam("customerID") Long customerID) {
 
