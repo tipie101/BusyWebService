@@ -18,6 +18,7 @@ import javax.websocket.server.PathParam;
 import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.sql.Timestamp;
 import java.util.List;
 import java.util.Optional;
 
@@ -73,11 +74,14 @@ public class RequestPreprocessorController {
         Long tagID = (Long) json.get("tagID");
         String userID = (String) json.get("userID");
 
+        if (timestamp <= 0) {
+            valid = false;
+        }
+
         if (isBlacklisted(userID)) {
             userID = "BLACKLISTED!!!";
             valid = false;
         }
-
 
         String remoteIP = (String) json.get("remoteIP");
         // check blacklist
@@ -119,21 +123,32 @@ public class RequestPreprocessorController {
         return "Successful Received: " + customerID + "(active:" + active + "), " + tagID + ", " + userID + ", " + remoteID + ", " + t;
     }
 
-    public void update_hourly_stats(long customID, long time, boolean validRequest) {
-        // update DB
-        List<RequestStat> stats = hourlyStatRepo.findRecentRequestsForCostumer(customID, time - 1000*60*60);
+    public void update_hourly_stats(long customerID, long time, boolean validRequest) {
+        // time is passed as sec
+        long TimeFloor = time - (time % 3600);
+        Timestamp hour = new Timestamp(TimeFloor * 1000);
+        List<RequestStat> stats = hourlyStatRepo.findHourlyStatsForCostumer(customerID, hour);
         if (stats.isEmpty()) {
             System.out.println("ALL EMPTY!");
             RequestStat stat = new RequestStat();
-            stat.setCustomerId(customID);
-            stat.setTime(time); // TODO: datetime-conversion
+            stat.setCustomerId(customerID);
+            stat.setTime(hour);
             stat.setInvalidCount(0);
             stat.setRequestCount(1);
             if (!validRequest) {
                 stat.setInvalidCount(1);
             }
             hourlyStatRepo.save(stat);
+            return;
         }
+            // Assert: stats.size() == 1
+            // There should only be one stat per hour
+            RequestStat stat = stats.get(0);
+            stat.setRequestCount(stat.getRequestCount() + 1);
+            if (!validRequest) {
+                stat.setInvalidCount(stat.getInvalidCount() + 1);
+            }
+            hourlyStatRepo.save(stat);
     }
 
     @RequestMapping(method = RequestMethod.GET, path = "/customerStats")
@@ -163,7 +178,7 @@ public class RequestPreprocessorController {
     }
 
     public BigInteger convertIP(String ip) {
-        // https://seancfoley.github.io/IPAddress/
+        // src: https://seancfoley.github.io/IPAddress/
         IPAddress ipAddress = new IPAddressString(ip).getAddress();
         return ipAddress.getValue();
     }

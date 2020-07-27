@@ -4,6 +4,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.data.repository.query.Param;
 
+import java.sql.Timestamp;
 import java.util.List;
 
 
@@ -12,8 +13,10 @@ public interface RepositoryHourlyStats extends CrudRepository<RequestStat, Integ
     @Query(value = "SELECT h FROM RequestStat h WHERE h.customerId = :customer_id")
     public List<RequestStat> findRequestsForCostumer(@Param("customer_id") Long customer_id);
 
-    @Query(value = "SELECT h FROM RequestStat h WHERE h.customerId = :customer_id AND h.time >= :min_time")
-    public List<RequestStat> findRecentRequestsForCostumer(
-            @Param("customer_id") Long customer_id, @Param("min_time") Long min_time);
+    @Query(value = "SELECT h FROM RequestStat h WHERE h.customerId = :customer_id AND h.time = :hour")
+    public List<RequestStat> findHourlyStatsForCostumer(
+            @Param("customer_id") Long customer_id, @Param("hour") Timestamp hour);
+
+
 
 }

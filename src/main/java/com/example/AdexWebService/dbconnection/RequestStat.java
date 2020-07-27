@@ -2,6 +2,7 @@ package com.example.AdexWebService.dbconnection;
 
 import javax.persistence.*;
 import java.math.BigInteger;
+import java.sql.Timestamp;
 
 @Entity
 @Table(name="hourly_stats")
@@ -18,7 +19,7 @@ public class RequestStat {
 
     // TODO: constrain: timestamp
     @Column(name="time")
-    private Long time;
+    private Timestamp time;
 
     // TODO: bigint(20)
     @Column(name="request_count")
@@ -57,11 +58,11 @@ public class RequestStat {
         this.customerId = customerId;
     }
 
-    public Long getTime() {
+    public Timestamp getTime() {
         return time;
     }
 
-    public void setTime(Long time) {
+    public void setTime(Timestamp time) {
         this.time = time;
     }
 
