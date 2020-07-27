@@ -3,6 +3,7 @@ package com.example.AdexWebService;
 import com.example.AdexWebService.dbconnection.*;
 import inet.ipaddr.IPAddress;
 import inet.ipaddr.IPAddressString;
+import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
@@ -18,8 +19,7 @@ import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.sql.Timestamp;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 // TODO:
 // {"customerID":1,"tagID":2,"userID":"aaaaaaaa-bbbb-cccc-1111-222222222222","remoteIP":"123.234.56.78","timestamp":1500000000}
@@ -45,19 +45,19 @@ public class RequestPreprocessorController {
 
     // TODO:
     // place db within project
-    // return json instead of Stings
     // refactor and write comments + docs
 
 
     @RequestMapping(consumes = MediaType.APPLICATION_JSON_VALUE, path = "/requests")
-    public String handleRequest(@RequestBody String body) {
+    public JSONObject handleRequest(@RequestBody String body) {
         boolean valid = true;
         JSONObject json;
         try {
             JSONParser parser = new JSONParser();
             json = (JSONObject) parser.parse(body);
         } catch (ParseException e) {
-            return e.toString();
+            System.out.println(e.toString());
+            return new JSONObject();
         }
 
         // check if all relevant-fields exist:
@@ -102,9 +102,16 @@ public class RequestPreprocessorController {
         return processValidRequest(customerID, tagID, userID, remoteIP, timestamp, activeCustomerFound);
     }
 
-    public String processValidRequest(Long customerID, Long tagID, String userID, String remoteID, Long t, boolean active) {
+    public JSONObject processValidRequest(Long customerID, Long tagID, String userID, String remoteID, Long t, boolean active) {
         // just a stub function
-        return "Successful Received: " + customerID + "(active:" + active + "), " + tagID + ", " + userID + ", " + remoteID + ", " + t;
+        JSONObject json = new JSONObject();
+        json.put("customerID", customerID);
+        json.put("userID", userID);
+        json.put("tagID", tagID);
+        json.put("remoteID", remoteID);
+        json.put("active", active);
+        return json;
+        // return "Successful Received: " + customerID + "(active:" + active + "), " + tagID + ", " + userID + ", " + remoteID + ", " + t;
     }
 
     public void update_hourly_stats(long customerID, long time, boolean validRequest) {
@@ -136,7 +143,7 @@ public class RequestPreprocessorController {
     }
 
     @RequestMapping(method = RequestMethod.GET, path = "/customersDailyStats")
-    public String getCostumersDailyStats(@PathParam("customerID") Long customerID, @PathParam("date") String date) {
+    public JSONObject getCostumersDailyStats(@PathParam("customerID") Long customerID, @PathParam("date") String date) {
         // check if customer exists in DB and date is valid
         // date has have format xxxx-xx-xx (autocreate zeros for m and d)
         List<RequestStat> stats = hourlyStatRepo.findStatsOfDayForCostumer(customerID, date);
@@ -147,11 +154,11 @@ public class RequestPreprocessorController {
         }
 
         int[] requestCounts  = aggregateRequestCounts(stats);
-        return "stats of " + date + " for customer_id " + customerID + ": #req = " + requestCounts[0] + " and #invalid = " + requestCounts[1];
+        return buildResponseJSON(requestCounts, stats);
     }
 
     @RequestMapping(method = RequestMethod.GET, path = "/customerStats")
-    public String getCostumerStats(@PathParam("customerID") Long customerID) {
+    public JSONObject getCostumerStats(@PathParam("customerID") Long customerID) {
 
         // check if customer exists in DB
 
@@ -164,11 +171,30 @@ public class RequestPreprocessorController {
 
         int[] requestCounts  = aggregateRequestCounts(stats);
 
-        return "stats for customer_id " + customerID + ": #req = " + requestCounts[0] + " and #invalid = " + requestCounts[1];
+        JSONObject response = buildResponseJSON(requestCounts, stats);
+        return response;
+        //return "stats for customer_id " + customerID + ": #req = " + requestCounts[0] + " and #invalid = " + requestCounts[1];
+    }
+
+    private JSONObject buildResponseJSON(int[] requestCounts, List<RequestStat> stats) {
+        JSONObject response = new JSONObject();
+        response.put("all_requests_count", requestCounts[0]);
+        response.put("invalid_requests_count", requestCounts[1]);
+        JSONArray array = new JSONArray();
+        for (RequestStat stat:  stats){
+            JSONObject statJSON = new JSONObject();
+            statJSON.put("customerID", stat.getCustomerId());
+            statJSON.put("time", stat.getTime());
+            statJSON.put("request_count", stat.getRequestCount());
+            statJSON.put("invalid_request_count", stat.getInvalidCount());
+            array.add(statJSON);
+        }
+        response.put("hourly_stats", array);
+        return response;
     }
 
     @RequestMapping(method = RequestMethod.GET, path = "/dailyStats")
-    public String getDailyStats(@PathParam("date") String date) {
+    public JSONObject getDailyStats(@PathParam("date") String date) {
         // TODO: Check if Date exists
 
         List<RequestStat> stats = hourlyStatRepo.findStatsOfDay(date);
@@ -180,8 +206,7 @@ public class RequestPreprocessorController {
         System.out.println(date);
 
         int[] requestCounts  = aggregateRequestCounts(stats);
-
-        return "stats(" + date + "): #req = " + requestCounts[0] + " and #invalid = " + requestCounts[1];
+        return buildResponseJSON(requestCounts, stats);
     }
 
     private int[] aggregateRequestCounts(List<RequestStat> stats) {
