@@ -21,18 +21,8 @@ import java.net.UnknownHostException;
 import java.sql.Timestamp;
 import java.util.*;
 
-// TODO:
-// {"customerID":1,"tagID":2,"userID":"aaaaaaaa-bbbb-cccc-1111-222222222222","remoteIP":"123.234.56.78","timestamp":1500000000}
-// write the formal validity checks
-// return json response
-// write db checks
-// Create the tables in MYSQL
-// Complete the tasks
-// What about huge traffic? What about security?
-
-// Annotation makes it that this class is automatically detected by project compilation
 @RestController
-public class RequestPreprocessorController {
+public class RequestPreprocessor {
 
     @Autowired
     private RepositoryHourlyStats hourlyStatRepo;
@@ -43,75 +33,89 @@ public class RequestPreprocessorController {
     @Autowired
     private RepositoryCustomer customerRepo;
 
-    // TODO:
-    // dump the db
-    // create README
-    // refactor and write comments + docs
-    // check and implement all constraints (like int(11) etc.)
-
 
     @RequestMapping(consumes = MediaType.APPLICATION_JSON_VALUE, path = "/requests")
     public JSONObject handleRequest(@RequestBody String body) {
-        boolean valid = true;
         JSONObject json;
+        Long customerID;
+        Long timestamp;
+        Long tagID;
+        String userID;
+
         try {
             JSONParser parser = new JSONParser();
             json = (JSONObject) parser.parse(body);
         } catch (ParseException e) {
+            // ill-formatted
             System.out.println(e.toString());
             return new JSONObject();
         }
 
-        // check if all relevant-fields exist:
-        Long customerID = (Long) json.get("customerID");
-        Long timestamp = (Long) json.get("timestamp");
-        Long tagID = (Long) json.get("tagID");
-        String userID = (String) json.get("userID");
-
-        if (timestamp <= 0) {
-            valid = false;
+        // check if all relevant-fields exist and filled with valid values
+        try {
+            customerID = (Long) json.get("customerID");
+            timestamp = (Long) json.get("timestamp");
+        } catch (ClassCastException e) {
+            return rejectRequest("Invalid Argument");
+        } catch (IllegalArgumentException e) {
+            return rejectRequest("Missing an Argument");
+        }
+        if (customerID < 0) {
+            return rejectRequest("CustomerIDs can not be negative");
+        }
+        if (timestamp < 0) {
+            return rejectRequest("Timestamps can not be negative");
+        }
+        // does the (unblocked) user exist in the db
+        Optional<Customer> customerReply = customerRepo.findById(customerID);
+        if (customerReply.isEmpty() || !customerReply.get().getActive()) {
+            return rejectRequest("No active customer found");
         }
 
-        if (isBlacklisted(userID)) {
-            userID = "BLACKLISTED!!!";
-            valid = false;
+        // from here on, stats can be updated since customerID and timestamp are valid
+        try {
+            tagID = (Long) json.get("tagID");
+            userID = (String) json.get("userID");
+        } catch (ClassCastException e) {
+            update_hourly_stats(customerID, timestamp, false);
+            return rejectRequest("Invalid Argument");
+        } catch (IllegalArgumentException e) {
+            update_hourly_stats(customerID, timestamp, false);
+            return rejectRequest("Missing an Argument");
         }
+
 
         String remoteIP = (String) json.get("remoteIP");
-        // check blacklist
-
         if (!isValidIP(remoteIP)) {
-            // add(convertIP(remoteIP)) to blacklist
-            remoteIP = "invalid IP";
-            valid = false;
-
+            update_hourly_stats(customerID, timestamp, false);
+            return rejectRequest("invalid IP");
         }
         BigInteger ipConverted = convertIP(remoteIP);
 
-        if (isBlacklisted(ipConverted)) {
-            remoteIP = "blacklisted IP";
-            valid = false;
+        if (isBlacklisted(userID) || isBlacklisted(ipConverted)) {
+            update_hourly_stats(customerID, timestamp, false);
+            return rejectRequest("Blacklisted");
         }
 
-        // does the (unblocked) user exist in the db
-        boolean activeCustomerFound = false;
-        Optional<Customer> customerReply = customerRepo.findById(customerID);
-        if (customerReply.isPresent()) {
-            activeCustomerFound = customerReply.get().getActive();
-        }
 
-        update_hourly_stats(customerID, timestamp, valid);
-        return processValidRequest(customerID, tagID, userID, remoteIP, timestamp, activeCustomerFound);
+        update_hourly_stats(customerID, timestamp, true);
+        return processValidRequest(customerID, tagID, userID, remoteIP, timestamp);
     }
 
-    public JSONObject processValidRequest(Long customerID, Long tagID, String userID, String remoteID, Long t, boolean active) {
+    private JSONObject rejectRequest(String message) {
+        JSONObject response = new JSONObject();
+        response.put("Status", "Error");
+        response.put("Error", message);
+        return response;
+    }
+
+    public JSONObject processValidRequest(Long customerID, Long tagID, String userID, String remoteID, Long t) {
         // just a stub function
         JSONObject json = new JSONObject();
         json.put("customerID", customerID);
         json.put("userID", userID);
         json.put("tagID", tagID);
         json.put("remoteID", remoteID);
-        json.put("active", active);
         return json;
         // return "Successful Received: " + customerID + "(active:" + active + "), " + tagID + ", " + userID + ", " + remoteID + ", " + t;
     }
@@ -146,8 +150,7 @@ public class RequestPreprocessorController {
 
     @RequestMapping(method = RequestMethod.GET, path = "/customersDailyStats")
     public JSONObject getCostumersDailyStats(@PathParam("customerID") Long customerID, @PathParam("date") String date) {
-        // check if customer exists in DB and date is valid
-        // date has have format xxxx-xx-xx (autocreate zeros for m and d)
+        // Date has to have format yyyy-mm-dd
         List<RequestStat> stats = hourlyStatRepo.findStatsOfDayForCostumer(customerID, date);
         if (stats.isEmpty()){
             System.out.println("nothing found customer");
