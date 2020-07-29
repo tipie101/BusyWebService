@@ -19,6 +19,7 @@ import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.sql.Timestamp;
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 @RestController
@@ -38,6 +39,7 @@ public class RequestPreprocessor {
     public JSONObject handleRequest(@RequestBody String body) {
         JSONObject json;
         Long customerID;
+        String remoteIP;
         Long timestamp;
         Long tagID;
         String userID;
@@ -47,8 +49,7 @@ public class RequestPreprocessor {
             json = (JSONObject) parser.parse(body);
         } catch (ParseException e) {
             // ill-formatted
-            System.out.println(e.toString());
-            return new JSONObject();
+            return rejectRequest("Badly Formatted JSON");
         }
 
         // check if all relevant-fields exist and filled with valid values
@@ -76,6 +77,7 @@ public class RequestPreprocessor {
         try {
             tagID = (Long) json.get("tagID");
             userID = (String) json.get("userID");
+            remoteIP = (String) json.get("remoteIP");
         } catch (ClassCastException e) {
             update_hourly_stats(customerID, timestamp, false);
             return rejectRequest("Invalid Argument");
@@ -84,8 +86,6 @@ public class RequestPreprocessor {
             return rejectRequest("Missing an Argument");
         }
 
-
-        String remoteIP = (String) json.get("remoteIP");
         if (!isValidIP(remoteIP)) {
             update_hourly_stats(customerID, timestamp, false);
             return rejectRequest("invalid IP");
@@ -117,7 +117,6 @@ public class RequestPreprocessor {
         json.put("tagID", tagID);
         json.put("remoteID", remoteID);
         return json;
-        // return "Successful Received: " + customerID + "(active:" + active + "), " + tagID + ", " + userID + ", " + remoteID + ", " + t;
     }
 
     public void update_hourly_stats(long customerID, long time, boolean validRequest) {
@@ -152,16 +151,11 @@ public class RequestPreprocessor {
     public JSONObject getCostumersDailyStats(@PathParam("customerID") Long customerID, @PathParam("date") String date) {
         // Date has to have format yyyy-mm-dd
         List<RequestStat> stats = hourlyStatRepo.findStatsOfDayForCostumer(customerID, date);
-        if (stats.isEmpty()){
-            System.out.println("nothing found customer");
-        } else {
-            System.out.println("found customer");
-        }
-
         int[] requestCounts  = aggregateRequestCounts(stats);
         return buildResponseJSON(requestCounts, stats);
     }
 
+    // optional, wasn't needed for the coding task
     @RequestMapping(method = RequestMethod.GET, path = "/customerStats")
     public JSONObject getCostumerStats(@PathParam("customerID") Long customerID) {
 
@@ -181,6 +175,24 @@ public class RequestPreprocessor {
         //return "stats for customer_id " + customerID + ": #req = " + requestCounts[0] + " and #invalid = " + requestCounts[1];
     }
 
+    // optional, wasn't needed for the coding task
+    @RequestMapping(method = RequestMethod.GET, path = "/dailyStats")
+    public JSONObject getDailyStats(@PathParam("date") String date) {
+        // Check if date is valid
+        String formatString = "yyyy-MM-dd";
+        try {
+            SimpleDateFormat format = new SimpleDateFormat(formatString);
+            format.setLenient(false);
+            format.parse(date);
+        } catch (java.text.ParseException e) {
+            return rejectRequest("Couldn't parse date; use yyyy-mm-dd as format");
+        }
+
+        List<RequestStat> stats = hourlyStatRepo.findStatsOfDay(date);
+        int[] requestCounts  = aggregateRequestCounts(stats);
+        return buildResponseJSON(requestCounts, stats);
+    }
+
     private JSONObject buildResponseJSON(int[] requestCounts, List<RequestStat> stats) {
         JSONObject response = new JSONObject();
         response.put("all_requests_count", requestCounts[0]);
@@ -196,22 +208,6 @@ public class RequestPreprocessor {
         }
         response.put("hourly_stats", array);
         return response;
-    }
-
-    @RequestMapping(method = RequestMethod.GET, path = "/dailyStats")
-    public JSONObject getDailyStats(@PathParam("date") String date) {
-        // TODO: Check if Date exists
-
-        List<RequestStat> stats = hourlyStatRepo.findStatsOfDay(date);
-        if (stats.isEmpty()){
-            System.out.println("stats.isEmpty()");
-        } else {
-            System.out.println("stats is not Empty");
-        }
-        System.out.println(date);
-
-        int[] requestCounts  = aggregateRequestCounts(stats);
-        return buildResponseJSON(requestCounts, stats);
     }
 
     private int[] aggregateRequestCounts(List<RequestStat> stats) {
@@ -249,11 +245,6 @@ public class RequestPreprocessor {
     public boolean isBlacklisted(BigInteger ip) {
         Optional<BlacklistIP> ipListed = blacklistIP.findById(ip);
         return ipListed.isPresent();
-    }
-
-    // TODO convert ip address to int!!!
-    public boolean isBlacklisted(Integer ip) {
-        return false;
     }
 
 }
